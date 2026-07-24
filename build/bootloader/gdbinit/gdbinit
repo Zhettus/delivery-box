@@ -1,0 +1,2 @@
+source /Users/zadyra/tail-light/build/bootloader/gdbinit/symbols
+source /Users/zadyra/tail-light/build/bootloader/gdbinit/connect
