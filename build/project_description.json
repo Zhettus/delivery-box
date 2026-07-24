@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "tail-light",
-    "project_version":    "1",
+    "project_version":    "c43968f-dirty",
     "project_path":       "/Users/zadyra/tail-light",
     "idf_path":           "/Users/zadyra/.espressif/v5.2.7/esp-idf",
     "build_dir":          "/Users/zadyra/tail-light/build",
@@ -831,12 +831,12 @@
             "type": "LIBRARY",
             "lib": "__idf_main",
             "reqs": [],
-            "priv_reqs": [ "espressif__led_strip" ],
+            "priv_reqs": [ "espressif__led_strip", "esp_timer" ],
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__led_strip" ],
             "file": "/Users/zadyra/tail-light/build/esp-idf/main/libmain.a",
-            "sources": [ "/Users/zadyra/tail-light/main/tail-light.c", "/Users/zadyra/tail-light/main/eyes.c" ],
-            "include_dirs": [ "." ]
+            "sources": [ "/Users/zadyra/tail-light/main/Startup.c", "/Users/zadyra/tail-light/main/components/led/led.c", "/Users/zadyra/tail-light/main/components/eyes/eyes.c", "/Users/zadyra/tail-light/main/components/tail-light/tail-light.c" ],
+            "include_dirs": [ ".", "components/led", "components/eyes", "components/tail-light" ]
         },
         "mbedtls": {
             "alias": "idf::mbedtls",
@@ -2155,10 +2155,10 @@
             "dir": "/Users/zadyra/tail-light/main",
             "lib": "__idf_main",
             "reqs": [],
-            "priv_reqs": [ "espressif__led_strip" ],
+            "priv_reqs": [ "espressif__led_strip", "esp_timer" ],
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__led_strip" ],
-            "include_dirs": [ "." ]
+            "include_dirs": [ ".", "components/led", "components/eyes", "components/tail-light" ]
         },
         "espressif__led_strip": {
             "alias": "idf::espressif__led_strip",

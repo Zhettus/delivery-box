@@ -70,9 +70,7 @@ static strip_t s_strips[NUM_STRIPS] = {
     { .gpio = DATA_PIN_2 },
 };
 
-static uint8_t s_brightness;          /* FastLED.setBrightness() equivalent */
-
-/* ------------------------------------------------------------------- helpers */
+static uint8_t s_brightness;          
 
 static inline uint32_t millis(void)
 {

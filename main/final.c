@@ -1,74 +1,22 @@
-#include "tail-light-abstract.h"
+#include "components/led/led-blink.h"
+#include "components/eyes/eyes.h"
 #include "driver/gpio.h"
-#include "esp_log.h"              // ESP_LOGI and friends
-#include "freertos/FreeRTOS.h"    // pdMS_TO_TICKS
-#include "freertos/task.h"        // vTaskDelay
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h"
+#include "string.h"
+void app_main(void)
+{
+    ESP_ERROR_CHECK(eyes_init());
+    ESP_ERROR_CHECK(led_init());
+    eyes_set_brightness_cap(0.05f);
 
-#define PIN_RUN    GPIO_NUM_10   // IN1
-#define PIN_BRAKE  GPIO_NUM_9    // IN2
-#define PIN_LEFT   GPIO_NUM_7    // IN3
-#define PIN_RIGHT  GPIO_NUM_8    // IN4
+    eyes_set_emotion(EYE_THINKING, 2.5f);
 
-static const char *TAG = "tail-light";
-static light_t g_state = {0};
-
-static inline void write_lamp(gpio_num_t pin, bool on) {
-    gpio_set_level(pin, on ? 0 : 1);          
-}
-
-static void push(void) {                     
-    write_lamp(PIN_RUN,   g_state.run);
-    write_lamp(PIN_BRAKE, g_state.brake);
-    write_lamp(PIN_LEFT,  g_state.left);
-    write_lamp(PIN_RIGHT, g_state.right);
-}
-
-void light_init(void) {
-    gpio_config_t io = {
-        .pin_bit_mask = (1ULL<<PIN_RUN)|(1ULL<<PIN_BRAKE)|(1ULL<<PIN_LEFT)|(1ULL<<PIN_RIGHT),
-        .mode         = GPIO_MODE_OUTPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&io);
-    g_state = (light_t){0};
-    push();                             
-}
-
-void    light_set(light_t s) { g_state = s; push(); }
-light_t light_get(void)      { return g_state; }
-
-void light_run  (bool on) { g_state.run   = on; push(); }
-void light_brake(bool on) { g_state.brake = on; push(); }
-void light_left (bool on) { g_state.left  = on; push(); }
-void light_right(bool on) { g_state.right = on; push(); }
-
-
-void light_all_off(void)         { light_set((light_t){0}); }
-void light_moving (void)         { light_set((light_t){ .run=true }); }
-void light_stop   (void)         { light_set((light_t){ .run=true, .brake=true }); }
-void light_hazards(bool on)      { g_state.left = on; g_state.right = on; push(); }
-void light_signal_left (bool on) { g_state.left  = on; g_state.right = false; push(); }
-void light_signal_right(bool on) { g_state.right = on; g_state.left  = false; push(); }
-
-
-void app_main(void){
-    light_init();
-
-    ESP_LOGI(TAG, "Lights are starting....");
-
-    light_run(true);                     // running light on
-    vTaskDelay(pdMS_TO_TICKS(5000));
-    light_run(false);
-
-    light_stop();                        // run + brake (no argument)
-    vTaskDelay(pdMS_TO_TICKS(3000));
-    light_all_off();                     // clear the stop state
-
-    light_left(true);                    // left signal — hardware sweeps
-    vTaskDelay(pdMS_TO_TICKS(5000));
-    light_left(false);
-
-    ESP_LOGI(TAG, "DONE");
+    while (1) {
+        led_set(LED_SOLID, RGB_RED,    1.0f);  vTaskDelay(pdMS_TO_TICKS(3000));
+        led_set(LED_PULSE, RGB_BLUE,   0.6f);  vTaskDelay(pdMS_TO_TICKS(5000));
+        led_set(LED_BLINK, RGB_YELLOW, 0.25f); vTaskDelay(pdMS_TO_TICKS(3000));
+        led_set_off(2.0f);                     vTaskDelay(pdMS_TO_TICKS(3000));
+    }
 }
