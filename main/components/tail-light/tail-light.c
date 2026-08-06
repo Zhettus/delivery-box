@@ -10,7 +10,7 @@
 #define PIN_BRAKE  GPIO_NUM_25   /* IN2 */
 #define PIN_LEFT   GPIO_NUM_33   /* IN3 */
 #define PIN_RIGHT  GPIO_NUM_32   /* IN4 */
-
+ 
 #if CONFIG_IDF_TARGET_ESP32
   #define PIN_IS_FLASH(p)  ((p) >= 6 && (p) <= 11)
   _Static_assert(!PIN_IS_FLASH(PIN_RUN),   "PIN_RUN is an SPI flash pin");

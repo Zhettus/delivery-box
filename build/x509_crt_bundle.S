@@ -1,4 +1,4 @@
-/* * Data converted from /Users/zadyra/tail-light/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from /home/zhettus/delivery-box/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 .section .rodata.embedded

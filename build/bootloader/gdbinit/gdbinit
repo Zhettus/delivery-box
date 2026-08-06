@@ -1,2 +1,2 @@
-source /Users/zadyra/tail-light/build/bootloader/gdbinit/symbols
-source /Users/zadyra/tail-light/build/bootloader/gdbinit/connect
+source /home/zhettus/delivery-box/build/bootloader/gdbinit/symbols
+source /home/zhettus/delivery-box/build/bootloader/gdbinit/connect
