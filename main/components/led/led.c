@@ -24,13 +24,24 @@ static const char *TAG = "led_fade";
 
 #define MAX_POWER_MW        (5U * 2000U)
 
-/* TypicalLEDStrip == 0xFFB0F0 */
+// TypicalLEDStrip == 0xFFB0F0 
 #define CORRECTION_R        0xFF
 #define CORRECTION_G        0xB0
 #define CORRECTION_B        0xF0
-#define SKETCH_RGB_ORDER    0
+#define SKETCH_RGB_ORDER    1
 
 #define FADE_SKIP_LEVEL     0.002f
+
+/*Comet loop (leds_comet_at / leds_fill_to): the two strips form one closed
+  racetrack.
+  s_strips[] order is { GPIO19, GPIO18 }, so left (GPIO18) is index 1. */
+#define LEFT_STRIP_IDX      1           // GPIO 18 
+#define RIGHT_STRIP_IDX     0           // GPIO 19 
+#define LOOP_LEN            (NUM_LEDS * NUM_STRIPS)   // pixels around the loop
+#define COMET_LEN           10          // lit length of the moving comet
+
+#define MAX_BRIGHTNESS      220
+#define FRAME_INTERVAL_MS   10          // fade frame pacing; yields to FreeRTOS
 
 typedef struct {
     led_strip_handle_t handle;
@@ -66,6 +77,11 @@ static float               s_fade_from    = 0.0f;
 static float               s_fade_dur     = LED_FADE_DEFAULT;
 
 static float               s_last_level   = 0.0f;
+
+/* Manual override: while set, led_task yields and stops touching the strips so
+ * a direct animation (leds_comet_at / leds_fill_to) has sole control of the
+ * hardware. led_set() clears it to hand control back to the fade task. */
+static volatile bool       s_manual       = false;
 
 static inline uint8_t scale8(uint8_t i, uint8_t scale)
 {
@@ -246,6 +262,12 @@ static void led_task(void *arg)
     TickType_t last_wake = xTaskGetTickCount();
 
     for (;;) {
+        /* A direct animation owns the strips; don't fight it over the wire. */
+        if (s_manual) {
+            xTaskDelayUntil(&last_wake, period);
+            continue;
+        }
+
         int64_t now_us = esp_timer_get_time();
         float   level;
 
@@ -330,6 +352,7 @@ void led_set(led_mode_t mode, rgb_t color, float fade_s)
         fade_s = LED_FADE_MIN;
     }
 
+    s_manual       = false;   /* hand control back to the fade task */
     s_target_color = color;
     s_target_fade  = fade_s;
     s_target       = mode;
@@ -376,4 +399,88 @@ void led_set_max_brightness(uint8_t max)
 {
     s_max_bright = max;
     ESP_LOGI(TAG, "max brightness -> %u", max);
+}
+
+/* circle/comet */
+
+/* Map a loop position [0, LOOP_LEN) to a physical (strip, led).
+ * 0..28   -> left strip,  LED 0..28 (ascending)
+ * 29..57  -> right strip, LED 28..0 (descending)
+ * so the two seams (left#28<->right#28 and right#0<->left#0) are the physically
+ * adjacent strip ends, and advancing the position walks one continuous loop. */
+static void loop_to_pixel(int p, int *strip, int *led)
+{
+    if (p < NUM_LEDS) {
+        *strip = LEFT_STRIP_IDX;
+        *led   = p;
+    } else {
+        *strip = RIGHT_STRIP_IDX;
+        *led   = (2 * NUM_LEDS - 1) - p;   /* 29->28 ... 57->0 */
+    }
+}
+
+/* Draw a comet whose head is at fractional loop position `head`: a bright head
+ * with a linearly fading tail behind it. The head straddles two pixels
+ * (anti-aliased) so sub-pixel head positions render smoothly. */
+static void render_comet(rgb_t color, float head)
+{
+    fill_solid(RGB_BLACK);
+
+    for (int p = 0; p < LOOP_LEN; p++) {
+        /* g = how far pixel p sits behind the head, wrapped to [0, LOOP_LEN). */
+        float g = head - (float)p;
+        if (g < 0.0f) {
+            g += (float)LOOP_LEN;
+        }
+
+        float intensity;
+        if (g < COMET_LEN) {
+            intensity = 1.0f - g / (float)COMET_LEN;          /* head + tail */
+        } else if (g > (float)LOOP_LEN - 1.0f) {
+            intensity = 1.0f - ((float)LOOP_LEN - g);         /* leading edge */
+        } else {
+            continue;                                         /* dark */
+        }
+
+        int strip, led;
+        loop_to_pixel(p, &strip, &led);
+        s_strips[strip].leds[led].r = (uint8_t)(color.r * intensity);
+        s_strips[strip].leds[led].g = (uint8_t)(color.g * intensity);
+        s_strips[strip].leds[led].b = (uint8_t)(color.b * intensity);
+    }
+}
+
+/* Fill sweep: every pixel the head has already passed is solid `color`, the
+ * pixel the head is currently on is partially lit, the rest are dark. Every
+ * loop position is written, so no separate clear is needed. */
+static void render_fill(rgb_t color, float head)
+{
+    for (int p = 0; p < LOOP_LEN; p++) {
+        float lit = head - (float)p;      /* >=1 full, in (0,1) partial, else off */
+        float intensity = (lit >= 1.0f) ? 1.0f : (lit > 0.0f ? lit : 0.0f);
+
+        int strip, led;
+        loop_to_pixel(p, &strip, &led);
+        s_strips[strip].leds[led].r = (uint8_t)(color.r * intensity);
+        s_strips[strip].leds[led].g = (uint8_t)(color.g * intensity);
+        s_strips[strip].leds[led].b = (uint8_t)(color.b * intensity);
+    }
+}
+
+void leds_comet_at(rgb_t color, float progress)
+{
+    s_manual     = true;   /* freeze led_task for the duration of the animation */
+    s_last_level = 0.0f;   /* so the next led_set() fades in fresh, not from stale */
+    s_brightness = MAX_BRIGHTNESS;
+    render_comet(color, progress * (float)LOOP_LEN);
+    led_show();
+}
+
+void leds_fill_to(rgb_t color, float progress)
+{
+    s_manual     = true;   /* freeze led_task for the duration of the animation */
+    s_last_level = 0.0f;   /* so the next led_set() fades in fresh, not from stale */
+    s_brightness = MAX_BRIGHTNESS;
+    render_fill(color, progress * (float)LOOP_LEN);
+    led_show();
 }

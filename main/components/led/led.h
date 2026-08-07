@@ -18,7 +18,7 @@ typedef struct {
 
 #define LED_RGB(rr, gg, bb)  ((rgb_t){ (rr), (gg), (bb) })
 
-#define RGB_RED     LED_RGB(0x00, 0xFF, 0x00)
+#define RGB_RED     LED_RGB(0xFF, 0x00, 0x00)
 #define RGB_GREEN   LED_RGB(0x00, 0xFF, 0x00)
 #define RGB_BLUE    LED_RGB(0x00, 0x00, 0xFF)
 #define RGB_YELLOW  LED_RGB(0xFF, 0xFF, 0x00)
@@ -57,6 +57,10 @@ float led_get_fade(void);
 bool led_is_transitioning(void);
 
 void led_set_max_brightness(uint8_t max);
+
+void leds_comet_at(rgb_t color, float progress);
+
+void leds_fill_to(rgb_t color, float progress);
 
 #ifdef __cplusplus
 }

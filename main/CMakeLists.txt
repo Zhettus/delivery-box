@@ -1,8 +1,9 @@
 idf_component_register(
-    SRCS "tail-light-check.c"
+    SRCS "final.c"
          "components/led/led.c"
          "components/eyes/eyes.c"
-         "components/tail-light/mosfet.c"
+         "states.c"
+         "components/tail-light/tail-light.c"
     INCLUDE_DIRS "."
                  "components/led"
                  "components/eyes"

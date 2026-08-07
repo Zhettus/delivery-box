@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "tail-light",
-    "project_version":    "485594b-dirty",
+    "project_version":    "1461738-dirty",
     "project_path":       "/home/zhettus/delivery-box",
     "idf_path":           "/home/zhettus/.espressif/v5.2.7/esp-idf",
     "build_dir":          "/home/zhettus/delivery-box/build",
@@ -835,7 +835,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__led_strip" ],
             "file": "/home/zhettus/delivery-box/build/esp-idf/main/libmain.a",
-            "sources": [ "/home/zhettus/delivery-box/main/tail-light-check.c", "/home/zhettus/delivery-box/main/components/led/led.c", "/home/zhettus/delivery-box/main/components/eyes/eyes.c", "/home/zhettus/delivery-box/main/components/tail-light/mosfet.c" ],
+            "sources": [ "/home/zhettus/delivery-box/main/final.c", "/home/zhettus/delivery-box/main/components/led/led.c", "/home/zhettus/delivery-box/main/components/eyes/eyes.c", "/home/zhettus/delivery-box/main/states.c", "/home/zhettus/delivery-box/main/components/tail-light/tail-light.c" ],
             "include_dirs": [ ".", "components/led", "components/eyes", "components/tail-light" ]
         },
         "mbedtls": {

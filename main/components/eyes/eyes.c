@@ -44,6 +44,11 @@ static float                  s_last_level  = 0.0f;
 
 static volatile float         s_cap         = 0.05f;
 
+/* Manual override: when set, the task drives the eyes to s_manual_level and
+ * ignores the emotion state machine. eyes_set_emotion() clears it. */
+static volatile bool          s_manual       = false;
+static volatile float         s_manual_level = 0.0f;
+
 
 static uint32_t level_to_duty(float level)
 {
@@ -135,7 +140,16 @@ static void eyes_task(void *arg)
 
         s_last_level = level;
 
-        uint32_t duty = level_to_duty(level);
+        /* Manual override wins: the caller is driving brightness directly
+         * (e.g. syncing the eyes to a strip animation). Keep s_last_level in
+         * step so handing control back to an emotion resumes smoothly. */
+        float out = level;
+        if (s_manual) {
+            out = s_manual_level;
+            s_last_level = out;
+        }
+
+        uint32_t duty = level_to_duty(out);
         write_duty(EYE_CH_L, duty);
         write_duty(EYE_CH_R, duty);
 
@@ -199,8 +213,17 @@ void eyes_set_emotion(eye_emotion_t e, float fade_s)
         fade_s = EYE_FADE_MIN;
     }
 
+    s_manual      = false;   /* hand control back to the fade state machine */
     s_target_fade = fade_s;
     s_target      = e;
+}
+
+void eyes_set_level(float level)
+{
+    if (level < 0.0f) level = 0.0f;
+    if (level > 1.0f) level = 1.0f;
+    s_manual_level = level;
+    s_manual       = true;
 }
 
 void eyes_set_emotion_default(eye_emotion_t e)

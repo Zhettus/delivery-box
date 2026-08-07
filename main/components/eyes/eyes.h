@@ -57,6 +57,8 @@ typedef enum {
 esp_err_t eyes_init(void);
 void eyes_set_emotion(eye_emotion_t e, float fade_s);
 void eyes_set_emotion_default(eye_emotion_t e);
+
+void eyes_set_level(float level);
 void eyes_set_zero(void);
 eye_emotion_t eyes_get_emotion(void);
 eye_emotion_t eyes_get_target(void);

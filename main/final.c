@@ -1,5 +1,6 @@
-#include "components/led/led-blink.h"
+#include "components/led/led.h"
 #include "components/eyes/eyes.h"
+#include "states.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -9,14 +10,17 @@ void app_main(void)
 {
     ESP_ERROR_CHECK(eyes_init());
     ESP_ERROR_CHECK(led_init());
-    eyes_set_brightness_cap(0.05f);
+    eyes_set_brightness_cap(0.05f); //1.0f is full brightness
 
-    eyes_set_emotion(EYE_THINKING, 2.5f);
-
+    /* Demo: cycle through the states. */
     while (1) {
-        led_set(LED_SOLID, RGB_RED,    1.0f);  vTaskDelay(pdMS_TO_TICKS(3000));
-        led_set(LED_PULSE, RGB_BLUE,   0.6f);  vTaskDelay(pdMS_TO_TICKS(5000));
-        led_set(LED_BLINK, RGB_YELLOW, 0.25f); vTaskDelay(pdMS_TO_TICKS(3000));
-        led_set_off(2.0f);                     vTaskDelay(pdMS_TO_TICKS(3000));
+        start_up(); vTaskDelay(pdMS_TO_TICKS(5000));         
+        moving_with_task(); vTaskDelay(pdMS_TO_TICKS(5000));
+        success_waiting(); vTaskDelay(pdMS_TO_TICKS(5000));
+        success_open_door(); vTaskDelay(pdMS_TO_TICKS(5000));
+        moving_without_task(); vTaskDelay(pdMS_TO_TICKS(5000));
+        charging(5000);
+        failure(); vTaskDelay(pdMS_TO_TICKS(5000));
+        failure_not_critical(); vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
