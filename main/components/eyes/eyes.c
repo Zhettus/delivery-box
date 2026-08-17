@@ -44,8 +44,6 @@ static float                  s_last_level  = 0.0f;
 
 static volatile float         s_cap         = 0.05f;
 
-/* Manual override: when set, the task drives the eyes to s_manual_level and
- * ignores the emotion state machine. eyes_set_emotion() clears it. */
 static volatile bool          s_manual       = false;
 static volatile float         s_manual_level = 0.0f;
 
@@ -94,7 +92,7 @@ static inline void write_duty(ledc_channel_t ch, uint32_t duty)
 static void enter_state(eye_emotion_t e, int64_t now_us)
 {
     s_active      = e;
-    s_active_fade = s_target_fade;   /* adopt the requested speed */
+    s_active_fade = s_target_fade;  
     s_active_t0   = now_us;
     s_fading_out  = false;
 }
@@ -209,11 +207,11 @@ esp_err_t eyes_init(void)
 
 void eyes_set_emotion(eye_emotion_t e, float fade_s)
 {
-    if (!(fade_s >= EYE_FADE_MIN)) {   /* also catches NaN */
+    if (!(fade_s >= EYE_FADE_MIN)) {   
         fade_s = EYE_FADE_MIN;
     }
 
-    s_manual      = false;   /* hand control back to the fade state machine */
+    s_manual      = false;   
     s_target_fade = fade_s;
     s_target      = e;
 }

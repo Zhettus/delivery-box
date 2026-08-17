@@ -1,7 +1,3 @@
-/* Device states. Each function runs one cycle of a state and returns; the
- * caller loops to sustain it. The animated states drive the LED strip and the
- * eyes from a single `progress` value each frame, so the two stay in lockstep. */
-
 #include <math.h>
 
 #include "freertos/FreeRTOS.h"
@@ -11,11 +7,12 @@
 #include "states.h"
 #include "led.h"
 #include "eyes.h"
+#include "tail-light.h"
 
 #define BLINK_FADE_IN_MS   2000
 #define BLINK_FADE_OUT_MS  600
-#define ANIM_FRAME_MS      10     /* animation frame pacing (yields to FreeRTOS) */
-#define SUCCESS_LAP_MS     2000   /* one comet lap in success_waiting            */
+#define ANIM_FRAME_MS      10    
+#define SUCCESS_LAP_MS     2000  
 #define PULSE_S  1.0f 
 
 void start_up(void) 
@@ -28,6 +25,7 @@ void moving_with_task(void)
 {
     eyes_set_emotion(EYE_CONSTANT, PULSE_S);
     led_set(LED_PULSE, RGB_BLUE, PULSE_S);
+
 }
 
 void moving_without_task(void)
@@ -52,6 +50,7 @@ void failure(void)
 {
     eyes_set_emotion(EYE_CONSTANT, PULSE_S);
     led_set(LED_PULSE, RGB_RED, PULSE_S);
+    tail_lights_set_brake(true);
 }
 
 void failure_not_critical(void) 
