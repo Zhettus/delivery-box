@@ -62,6 +62,23 @@ void leds_comet_at(rgb_t color, float progress);
 
 void leds_fill_to(rgb_t color, float progress);
 
+
+
+
+void leds_diverge_start(void);
+void leds_diverge_stop(void);
+
+void leds_diverge_set_middle(float middle_px);          /* origin, in pixels (fractional ok) */
+void leds_diverge_set_spawn_interval_ms(uint32_t ms);   /* how often a new comet pair appears */
+void leds_diverge_set_frame_ms(uint32_t ms);            /* render tick — smoothness */
+void leds_diverge_set_speed(float px_per_s);            /* how fast heads travel outward */
+void leds_diverge_set_tail(float tail_px);              /* comet tail length */
+void leds_diverge_set_color(rgb_t color);
+
+
+
+
+
 #ifdef __cplusplus
 }
 #endif
