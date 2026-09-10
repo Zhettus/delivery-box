@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "led-check.c"
+    SRCS "eyes_check.c"
          "components/led/led-pulsation.c"
          "components/eyes/eyes.c"
          "states.c"

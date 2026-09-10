@@ -69,3 +69,4 @@ void eyes_set_brightness_cap(float cap);
 #ifdef __cplusplus
 }
 #endif
+

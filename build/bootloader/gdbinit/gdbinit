@@ -1,0 +1,2 @@
+source /home/zhettus/delivery-box/build/bootloader/gdbinit/symbols
+source /home/zhettus/delivery-box/build/bootloader/gdbinit/connect
