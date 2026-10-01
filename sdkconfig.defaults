@@ -1,0 +1,32 @@
+# ESP32-S3-WROOM-1 N16R8: 16 MB quad flash + 8 MB octal PSRAM
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# Octal PSRAM (GPIO 33-37 are taken by it — see board.h)
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# 1 kHz tick: 10 ms LED/eye frames and the 20 ms door loop land on exact ticks
+CONFIG_FREERTOS_HZ=1000
+
+# Serial console (logs + commands) on the NATIVE USB port ("USB", /dev/ttyACM0),
+# the port used for flashing. To use the "UART"/"COM" port (GPIO 43/44)
+# instead, replace the next line with CONFIG_ESP_CONSOLE_UART_DEFAULT=y.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# NOTE: do NOT enable CONFIG_RMT_ISR_IRAM_SAFE. The led_strip encoder runs from
+# flash, so an IRAM-safe RMT interrupt would crash during flash writes.
+
+# The door task feeds the task watchdog: a hung control loop resets the chip
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=2
+CONFIG_ESP_TASK_WDT_PANIC=y
+
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
