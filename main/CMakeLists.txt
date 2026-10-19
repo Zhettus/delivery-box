@@ -5,5 +5,7 @@ idf_component_register(
          "led.c"
          "face.c"
          "tail_light.c"
+         "sound.c"
     INCLUDE_DIRS "."
-    PRIV_REQUIRES driver esp_timer led_strip pwm_util door ina228)
+    PRIV_REQUIRES driver esp_timer led_strip pwm_util door ina228 audio
+    EMBED_FILES "gm.wav")

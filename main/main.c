@@ -3,25 +3,74 @@
  *
  * START WITH THE DOOR CLOSED: the shaft position at power-up is "closed".
  */
+#include "driver/i2c_master.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
+#include "audio.h"
+#include "board.h"
 #include "config.h"
 #include "face.h"
 #include "led.h"
 #include "motor.h"
+#include "sound.h"
 #include "states.h"
 #include "tail_light.h"
+
+static const char *TAG = "main";
+
+/* Someone held the door and it went back: beep (the door task calls this). */
+static void on_door_held(bool now_open)
+{
+    if (DOOR_HELD_SOUND) {
+        sound_play(SOUND_DOOR_HELD);
+    }
+}
+
+/* One I2C bus for the INA228 (motor current) and the WM8960 (audio HAT). */
+static i2c_master_bus_handle_t start_i2c_bus(void)
+{
+    i2c_master_bus_config_t bus_cfg = {
+        .i2c_port          = I2C_PORT_BOARD,
+        .sda_io_num        = PIN_I2C_SDA,
+        .scl_io_num        = PIN_I2C_SCL,
+        .clk_source        = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,   /* backup; the 4.7k externals do the work */
+    };
+    i2c_master_bus_handle_t bus;
+    ESP_ERROR_CHECK(i2c_new_master_bus(&bus_cfg, &bus));
+    ESP_LOGI(TAG, "I2C: INA228 0x%02X %s, WM8960 0x%02X %s", INA228_ADDRESS,
+             i2c_master_probe(bus, INA228_ADDRESS, 100) == ESP_OK ? "found" : "MISSING",
+             AUDIO_WM8960_ADDRESS, i2c_master_probe(bus, AUDIO_WM8960_ADDRESS, 100) == ESP_OK ? "found" : "MISSING");
+    return bus;
+}
+
+static void start_everything(void)
+{
+    /* A failed first I2C attempt now and then is normal on the shared bus and
+     * is retried (motor-audio-check): keep the driver's own messages quiet. */
+    esp_log_level_set("i2c.master", ESP_LOG_NONE);
+
+    i2c_master_bus_handle_t bus = start_i2c_bus();
+    ESP_ERROR_CHECK(motor_init(bus));   /* first: motor stopped, door locked */
+    /* Audio after the INA228: the codec is set up before the I2S clocks start. */
+    if (sound_init(bus) != ESP_OK) {
+        ESP_LOGW(TAG, "no audio HAT: the box stays silent");
+    }
+    tail_lights_init();
+    ESP_ERROR_CHECK(face_init());
+    ESP_ERROR_CHECK(led_init());
+    motor_on_door_held(on_door_held);
+}
 
 #if TEST_RUN
 
 #if !STATES_MOVE_DOOR
 #error "TEST_RUN needs STATES_MOVE_DOOR 1 (config.h): the states move the door"
 #endif
-
-static const char *TAG = "main";
 
 /*
  * Test run (times in config.h):
@@ -40,17 +89,26 @@ static const char *TAG = "main";
  * Tail lights: only the DRL (running light) on, from step 2 on. Face: solid on at FACE_BRIGHTNESS_CAP (5 %) from
  * step 2 on.
  *
- * If the door does not reach open or closed, the motor stops, the box shows
- * failure_not_critical() (yellow) and the test ends until the next reset.
+ * Hold the door while it moves to test the current guard: it goes back
+ * (closing -> open, opening -> closed) and beeps. The test then waits
+ * TEST_OPEN_PAUSE_MS and tries that step again.
+ *
+ * If the door does not reach open or closed otherwise, the motor stops, the
+ * box shows failure_not_critical() (yellow) and the test ends until the next
+ * reset.
  */
-static bool door_arrived(const char *where)
+static motor_result_t door_arrived(const char *where)
 {
-    if (motor_wait_done(60000)) {
+    motor_result_t r = motor_wait(60000);
+    if (r == MOTOR_DONE) {
         ESP_LOGI(TAG, "door %s at %.1f deg", where, motor_get_angle());
-        return true;
+    } else if (r == MOTOR_WENT_BACK) {
+        ESP_LOGW(TAG, "door held on the way to %s: went back (at %.1f deg)",
+                 where, motor_get_angle());
+    } else {
+        ESP_LOGE(TAG, "the door did not reach %s (at %.1f deg)", where, motor_get_angle());
     }
-    ESP_LOGE(TAG, "the door did not reach %s (at %.1f deg)", where, motor_get_angle());
-    return false;
+    return r;
 }
 
 static void wait_ms(uint32_t ms)
@@ -68,10 +126,7 @@ static void drl_only(void)
 
 void app_main(void)
 {
-    ESP_ERROR_CHECK(motor_init());      /* first: motor stopped, door locked */
-    tail_lights_init();
-    ESP_ERROR_CHECK(face_init());
-    ESP_ERROR_CHECK(led_init());
+    start_everything();
 
     ESP_LOGW(TAG, "TEST RUN: door %.0f deg, open at %.1f rpm, close at %.1f rpm",
              DOOR_OPEN_ANGLE_DEG, DOOR_OPEN_RPM, DOOR_CLOSE_RPM);
@@ -90,7 +145,12 @@ void app_main(void)
         success_waiting();                              /* green pulse */
         drl_only();
         motor_open_door();
-        if (!door_arrived("OPEN")) {
+        motor_result_t r = door_arrived("OPEN");
+        if (r == MOTOR_WENT_BACK) {                     /* closed again: start over */
+            wait_ms(TEST_OPEN_PAUSE_MS);
+            continue;
+        }
+        if (r != MOTOR_DONE) {
             break;
         }
 
@@ -99,7 +159,12 @@ void app_main(void)
 
         ESP_LOGI(TAG, "5. closing");
         motor_close_door();                             /* still green pulse */
-        if (!door_arrived("CLOSED")) {
+        while ((r = door_arrived("CLOSED")) == MOTOR_WENT_BACK) {
+            wait_ms(TEST_OPEN_PAUSE_MS);                /* open again: close again */
+            ESP_LOGI(TAG, "5. closing again");
+            motor_close_door();
+        }
+        if (r != MOTOR_DONE) {
             break;
         }
     }
@@ -119,12 +184,9 @@ static void hold(void)
 
 void app_main(void)
 {
-    ESP_ERROR_CHECK(motor_init());      /* first: motor stopped, door locked */
-    tail_lights_init();
-    ESP_ERROR_CHECK(face_init());
-    ESP_ERROR_CHECK(led_init());
+    start_everything();
 
-    /* If the door is blocked on every retry, show it. */
+    /* If the door gives up (stuck both ways, timed out), show it. */
     motor_on_fault(failure_not_critical);
 
     /* Door travel and speed come from config.h (DOOR_OPEN_ANGLE_DEG,

@@ -12,9 +12,19 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 
-/* ---- I2C bus: INA228 motor-current sensor (0x40), 4.7k pull-ups -------- */
+/* ---- I2C bus, shared (wiring doc §4.1), 4.7k pull-ups to 3.3 V ----------
+ *   INA228 motor-current sensor  0x40
+ *   WM8960 Audio HAT (P3 SDA, P5 SCL)  0x1A                                 */
 #define PIN_I2C_SDA         GPIO_NUM_1
 #define PIN_I2C_SCL         GPIO_NUM_2
+
+/* ---- I2S, one port (wiring doc §4.2, §6.4, §6.5) ------------------------
+ * The ESP32 is the clock master; the WM8960 follows BCLK/WS.               */
+#define PIN_I2S_BCLK        GPIO_NUM_14   /* WM8960 P12  + ICS43434 BCLK      */
+#define PIN_I2S_WS          GPIO_NUM_15   /* WM8960 P35 (LRCLK) + ICS43434 LRCL */
+#define PIN_I2S_DOUT        GPIO_NUM_16   /* WM8960 P40 (DACDAT): to the speaker */
+#define PIN_I2S_DIN         GPIO_NUM_17   /* ICS43434 DOUT: microphone (wired,
+                                             not used by this firmware yet)  */
 
 /* ---- WS2815 LED strip (one strip, 134 LEDs) ---------------------------- */
 #define PIN_LED_STRIP       GPIO_NUM_4
@@ -52,8 +62,7 @@
  *   door CLOSED = switch closed = LOW      door OPEN = switch open = HIGH   */
 #define PIN_DOOR_SWITCH     GPIO_NUM_5
 
-/* Not used by this firmware: GPIO 14-17 (audio in the esp32s3 project),
- * 6, 7, 13, 39, 42, 47, 48. */
+/* Not used by this firmware: GPIO 6, 7, 13, 39, 42, 47, 48. */
 
 /* ------------------------------------------------------------------------ */
 /* Peripheral allocation (so no two drivers ever claim the same unit)       */
@@ -64,7 +73,8 @@
  *   timer 1 -> door motor   channel  3     (20 kHz, above hearing)
  *   timer 2 -> door latch   channel  4     (solenoid, hold power)
  * RMT   : 1 TX channel for the LED strip
- * I2C   : I2C0 master
+ * I2C   : I2C0 master (INA228 + WM8960)
+ * I2S   : I2S0 TX (WM8960)
  * PCNT  : 1 unit for the motor FG pulses
  * The tail lights are plain on/off GPIOs.
  */
@@ -95,6 +105,8 @@
     _Static_assert(!BOARD_PIN_FORBIDDEN(p), #p " is on a forbidden GPIO (see board.h)")
 
 BOARD_CHECK_PIN(PIN_I2C_SDA);      BOARD_CHECK_PIN(PIN_I2C_SCL);
+BOARD_CHECK_PIN(PIN_I2S_BCLK);     BOARD_CHECK_PIN(PIN_I2S_WS);
+BOARD_CHECK_PIN(PIN_I2S_DOUT);     BOARD_CHECK_PIN(PIN_I2S_DIN);
 BOARD_CHECK_PIN(PIN_LED_STRIP);
 BOARD_CHECK_PIN(PIN_TAIL_BRAKE);   BOARD_CHECK_PIN(PIN_TAIL_RUN);
 BOARD_CHECK_PIN(PIN_TAIL_LEFT);    BOARD_CHECK_PIN(PIN_TAIL_RIGHT);
@@ -106,12 +118,14 @@ BOARD_CHECK_PIN(PIN_DOOR_LATCH);   BOARD_CHECK_PIN(PIN_DOOR_SWITCH);
 /* No pin used twice: for distinct pins the sum of the bits equals their OR. */
 #define B_(p) (1ULL << (p))
 #define BOARD_PINS_SUM (B_(PIN_I2C_SDA) + B_(PIN_I2C_SCL) +                   \
+    B_(PIN_I2S_BCLK) + B_(PIN_I2S_WS) + B_(PIN_I2S_DOUT) + B_(PIN_I2S_DIN) +  \
     B_(PIN_LED_STRIP) + B_(PIN_TAIL_BRAKE) + B_(PIN_TAIL_RUN) +             \
     B_(PIN_TAIL_LEFT) + B_(PIN_TAIL_RIGHT) + B_(PIN_FACE) +                   \
     B_(PIN_MOTOR_PWM) +         \
     B_(PIN_MOTOR_DIR) + B_(PIN_MOTOR_BRAKE) + B_(PIN_MOTOR_FG) +              \
     B_(PIN_DOOR_LATCH) + B_(PIN_DOOR_SWITCH))
 #define BOARD_PINS_OR (B_(PIN_I2C_SDA) | B_(PIN_I2C_SCL) |                    \
+    B_(PIN_I2S_BCLK) | B_(PIN_I2S_WS) | B_(PIN_I2S_DOUT) | B_(PIN_I2S_DIN) |  \
     B_(PIN_LED_STRIP) | B_(PIN_TAIL_BRAKE) | B_(PIN_TAIL_RUN) |             \
     B_(PIN_TAIL_LEFT) | B_(PIN_TAIL_RIGHT) | B_(PIN_FACE) |                   \
     B_(PIN_MOTOR_PWM) |         \

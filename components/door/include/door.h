@@ -168,9 +168,15 @@ typedef struct {
 
 /*
  * One door move: turn by `degrees` from WHEREVER the door is now.
- * The start position is the move's ANCHOR. On resistance the door stops,
- * goes back to the anchor (counted in feedback pulses, not seconds), waits
- * `retry_wait_ms` and tries again, up to `max_retries` times.
+ * On resistance (motor current rise, or the door too slow) the door stops
+ * and goes back to the move's ANCHOR (counted in feedback pulses, not
+ * seconds): the start position, or `anchor_deg` if `anchor_set`. Then it
+ * waits `retry_wait_ms` and tries again, up to `max_retries` times; with no
+ * retries left it stays at the anchor, in that position's resting state
+ * (fault OBSTRUCTED, result RETURNED).
+ *
+ * Going back to closed (anchor 0) with a door switch ends like a normal
+ * close: it seats at the switch and the latch locks.
  */
 typedef struct {
     float                 degrees;       /* + = opening direction, - = closing;
@@ -179,7 +185,9 @@ typedef struct {
     float                 rpm;           /* output-shaft speed                    */
     float                 return_rpm;    /* speed back to the anchor (0 = rpm)    */
     door_current_limits_t current;       /* resistance limits for THIS move       */
-    uint8_t               max_retries;   /* 0 = go back once and give up          */
+    bool                  anchor_set;    /* true: on resistance go back to...     */
+    float                 anchor_deg;    /* ...this angle (e.g. 0 = closed)       */
+    uint8_t               max_retries;   /* 0 = go back once and stay there       */
     uint32_t              retry_wait_ms; /* wait at the anchor before retrying    */
     uint32_t              timeout_ms;    /* per attempt; 0 = automatic            */
 } door_move_t;
@@ -218,7 +226,7 @@ void door_home(void);
 /**
  * Another sensor (e.g. the INA228 motor current) sees resistance right now.
  * Call it repeatedly while the condition lasts; the next control tick treats
- * it like any obstruction: back off to the previous position, wait, retry.
+ * it like any obstruction: go back to the move's anchor (see door_move_t).
  * Ignored while the door is not moving and during the spin-up grace period.
  */
 void door_report_obstruction(void);

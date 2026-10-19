@@ -126,20 +126,33 @@
 #define DOOR_APPROACH_RPM             3.0f
 #define DOOR_HOMING_RPM               3.0f
 
-/* Resistance from the MOTOR CURRENT (INA228). A limit of 0 switches it off.
- * Resistance = current above LIMIT, or RISE above the normal running
- * current, for CONFIRM_MS.                                         [MEASURE] */
+/* Someone HOLDING THE DOOR (or anything in its way) makes the motor work
+ * harder, so its current rises. The INA228 in the motor supply sees it:
+ *
+ *   resistance = current above LIMIT, or RISE above the normal running
+ *                current (learned per direction), for CONFIRM_MS
+ *
+ * On resistance the door goes back to where it was before the move:
+ *   closing -> resistance -> opens again  (door OPEN)
+ *   opening -> resistance -> closes again (door CLOSED, latch locks)
+ * A limit of 0 switches it off. The door being much slower than commanded
+ * (DOOR_OBSTRUCTION_*) counts as resistance too.
+ * To find good values: motor-audio-check, `idf.py -DCURRENT_LOG=1`, open and
+ * close a few times, then hold the door during a move.            [MEASURE] */
 #define DOOR_CURRENT_LIMIT_A          1.50f  /* estimate: motor draws 0.17 A free at full speed */
 #define DOOR_CURRENT_RISE_A           0.50f  /* the door gets heavier as it lifts: leave room */
 #define DOOR_CURRENT_CONFIRM_MS       250
 #define DOOR_CURRENT_IGNORE_MS        400    /* start-up spike of every move */
 
-/* On resistance: stop -> go back to where the move started -> wait -> retry */
+/* On resistance: stop -> go back to the previous state (see above) */
 #define DOOR_SPINUP_GRACE_MS          500    /* no detection right after start */
 #define DOOR_OBSTRUCTION_MS           800    /* too slow for this long = blocked */
 #define DOOR_OBSTRUCTION_RATIO        0.35f  /* too slow = < 35 % of commanded */
+/* After going back: 0 = stay there (the next state command moves the door
+ * again). > 0 = wait DOOR_RETRY_WAIT_MS, then try the move again, this
+ * many times, before staying in the previous state. */
+#define DOOR_MAX_RETRIES              0
 #define DOOR_RETRY_WAIT_MS            3000
-#define DOOR_MAX_RETRIES              3
 #define DOOR_MOVE_TIMEOUT_MS          10000
 
 /* Close the door by itself this long after it opened. 0 = never: the door
@@ -157,9 +170,25 @@
 #define LATCH_PWM_HZ                  1000
 
 /* ======================================================================== */
-/* Motor current sensor — INA228                                            */
+/* Shared I2C bus + motor current sensor — INA228                           */
 /* ======================================================================== */
+/* 100 kHz: the speed the WM8960 HAT works at on the shared bus
+ * (motor-audio-check). The INA228 is fine with it. */
+#define I2C_SPEED_HZ                  100000
 #define INA228_ADDRESS                0x40   /* A0 = A1 = GND */
 #define INA228_SHUNT_OHMS             0.002f /* on-board shunt marked "R002" */
 #define INA228_MAX_CURRENT_A          20.0f
-#define I2C_SPEED_HZ                  400000
+
+/* ======================================================================== */
+/* Audio — WM8960 Audio HAT (speaker)                                       */
+/* ======================================================================== */
+#define AUDIO_ENABLED                 1      /* 0 = no HAT fitted: silent box */
+#define AUDIO_SAMPLE_RATE_HZ          48000  /* start rate; a WAV uses its own */
+#define AUDIO_VOLUME_PERCENT          100    /* 0..100, 100 = +6 dB (motor-audio-check) */
+#define AUDIO_TONE_LEVEL              0.35f  /* 0..1 digital level of beeps */
+#define AUDIO_AMP_OFF_AFTER_MS        500    /* speaker amp off after the last sound */
+
+/* 1 = the robot states play their sounds (see states.c), 0 = silent. */
+#define STATE_SOUNDS                  1
+/* Warning beep when someone held the door and it went back. */
+#define DOOR_HELD_SOUND               1

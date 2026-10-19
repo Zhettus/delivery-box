@@ -25,6 +25,7 @@ static float s_close_rpm = DOOR_CLOSE_RPM;
 
 static ina228_handle_t s_ina228;
 static void          (*s_fault_callback)(void);
+static void          (*s_held_callback)(bool now_open);
 
 /* Keep a requested speed inside what the motor can do. */
 static float limit_rpm(float rpm)
@@ -125,20 +126,10 @@ static bool read_motor_current(float *amps, void *ctx)
     return ina228_read_current(s_ina228, amps) == ESP_OK;
 }
 
-/* INA228 on the I2C bus: it sits in the motor's supply wire. */
-static esp_err_t start_current_sensor(void)
+/* INA228 on the shared I2C bus: it sits in the motor's supply wire. */
+static esp_err_t start_current_sensor(i2c_master_bus_handle_t bus)
 {
-    i2c_master_bus_config_t bus_cfg = {
-        .i2c_port          = I2C_PORT_BOARD,
-        .sda_io_num        = PIN_I2C_SDA,
-        .scl_io_num        = PIN_I2C_SCL,
-        .clk_source        = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,   /* backup; the 4.7k externals do the work */
-    };
-    i2c_master_bus_handle_t bus;
-    ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_cfg, &bus), TAG, "I2C bus");
-
+    ESP_RETURN_ON_FALSE(bus != NULL, ESP_ERR_INVALID_ARG, TAG, "no I2C bus");
     ina228_config_t ina_cfg = {
         .bus           = bus,
         .address       = INA228_ADDRESS,
@@ -159,6 +150,13 @@ static void on_door_event(door_state_t state, door_fault_t fault, void *ctx)
         ESP_LOGW(TAG, "door gave up: %s", door_fault_name(fault));
         if (s_fault_callback) {
             s_fault_callback();
+        }
+    } else if (fault == DOOR_FAULT_OBSTRUCTED) {
+        bool now_open = (state != DOOR_STATE_CLOSED);
+        ESP_LOGW(TAG, "door held while %s: back %s", now_open ? "closing" : "opening",
+                 now_open ? "OPEN" : "CLOSED");
+        if (s_held_callback) {
+            s_held_callback(now_open);
         }
     }
 }
@@ -204,7 +202,7 @@ static void log_task(void *arg)
 }
 #endif
 
-esp_err_t motor_init(void)
+esp_err_t motor_init(i2c_master_bus_handle_t bus)
 {
     door_config_t cfg = door_config();
     ESP_RETURN_ON_ERROR(door_init(&cfg), TAG, "door");
@@ -215,8 +213,8 @@ esp_err_t motor_init(void)
 
     /* The door still works without the current sensor (it then only notices
      * a blocked door from the motor slowing down), so keep going. */
-    if (start_current_sensor() != ESP_OK) {
-        ESP_LOGW(TAG, "INA228 not available: NO current-based resistance detection");
+    if (start_current_sensor(bus) != ESP_OK) {
+        ESP_LOGW(TAG, "INA228 not available: NO current-based detection of a held door");
     }
 
     if (s_ina228) {
@@ -251,16 +249,29 @@ void motor_set_speed(float open_rpm, float close_rpm)
 
 /* ---- door ---------------------------------------------------------------------- */
 
+/* Go TO `target_deg`; if someone holds the door, go back to `back_deg`. */
+static void door_go(float target_deg, float rpm, float back_deg)
+{
+    door_move_t m = door_move_defaults(target_deg, rpm);
+    m.absolute        = true;
+    m.current.limit_a = DOOR_CURRENT_LIMIT_A;
+    m.anchor_set      = true;
+    m.anchor_deg      = back_deg;
+    door_rotate_start(&m);
+}
+
+/* Held while opening: closes again (and locks). */
 void motor_open_door(void)
 {
-    door_move_to_start(s_open_deg, s_open_rpm, DOOR_CURRENT_LIMIT_A);
+    door_go(s_open_deg, s_open_rpm, 0.0f);
 }
 
 /* Closes until the door switch closes, seats DOOR_SEAT_MS, stops (that spot
- * becomes the new 0); the latch locks DOOR_LATCH_DELAY_MS after the switch. */
+ * becomes the new 0); the latch locks DOOR_LATCH_DELAY_MS after the switch.
+ * Held while closing: opens again. */
 void motor_close_door(void)
 {
-    door_move_to_start(0.0f, s_close_rpm, DOOR_CURRENT_LIMIT_A);
+    door_go(0.0f, s_close_rpm, s_open_deg);
 }
 
 void motor_stop(void)
@@ -270,7 +281,17 @@ void motor_stop(void)
 
 bool motor_wait_done(uint32_t timeout_ms)
 {
-    return door_wait(timeout_ms) == DOOR_RESULT_DONE;
+    return motor_wait(timeout_ms) == MOTOR_DONE;
+}
+
+motor_result_t motor_wait(uint32_t timeout_ms)
+{
+    switch (door_wait(timeout_ms)) {
+    case DOOR_RESULT_DONE:     return MOTOR_DONE;
+    case DOOR_RESULT_RETURNED: return MOTOR_WENT_BACK;
+    case DOOR_RESULT_BUSY:     return MOTOR_STILL_MOVING;
+    default:                   return MOTOR_FAILED;
+    }
 }
 
 /* ---- free rotation ------------------------------------------------------------- */
@@ -293,4 +314,9 @@ float motor_get_angle(void)
 void motor_on_fault(void (*callback)(void))
 {
     s_fault_callback = callback;
+}
+
+void motor_on_door_held(void (*callback)(bool now_open))
+{
+    s_held_callback = callback;
 }

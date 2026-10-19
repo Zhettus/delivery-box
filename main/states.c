@@ -9,6 +9,7 @@
 #include "face.h"
 #include "led.h"
 #include "motor.h"
+#include "sound.h"
 #include "states.h"
 #include "tail_light.h"
 
@@ -23,12 +24,16 @@ static void door_open(void)  { if (STATES_MOVE_DOOR) motor_open_door();  }
 static void door_close(void) { if (STATES_MOVE_DOOR) motor_close_door(); }
 static void door_stop(void)  { if (STATES_MOVE_DOOR) motor_stop();       }
 
+/* Sounds play only if STATE_SOUNDS is 1 (config.h). */
+static void say(sound_t s)   { if (STATE_SOUNDS) sound_play(s); }
+
 void start_up(void)
 {
     ESP_LOGI(TAG, "start_up");
     face_set_emotion(FACE_THINKING, PULSE_S);
     led_set(LED_PULSE, RGB_WHITE, PULSE_S);
     tail_lights_off_all();
+    say(SOUND_STARTUP);
 }
 
 void moving_with_task(void)
@@ -55,6 +60,7 @@ void success_waiting(void)
     face_set_emotion(FACE_CONSTANT, PULSE_S);
     led_set(LED_PULSE, RGB_GREEN, PULSE_S);
     tail_lights_off_all();
+    say(SOUND_ARRIVED);
 }
 
 void success_open_door(void)
@@ -63,6 +69,7 @@ void success_open_door(void)
     face_set_emotion(FACE_CONSTANT, PULSE_S);
     led_set(LED_SOLID, RGB_GREEN, PULSE_S);
     tail_lights_off_all();
+    say(SOUND_GREETING);
     door_open();
 }
 
@@ -74,6 +81,7 @@ void failure(void)
     tail_lights_off_all();
     tail_lights_set_brake(true);
     door_stop();                    /* critical failure: freeze the door */
+    say(SOUND_FAILURE);
 }
 
 void failure_not_critical(void)
@@ -82,6 +90,7 @@ void failure_not_critical(void)
     face_set_emotion(FACE_CONSTANT, PULSE_S);
     led_set(LED_PULSE, RGB_YELLOW, PULSE_S);
     tail_lights_off_all();
+    say(SOUND_WARNING);
 }
 
 void charging(uint32_t duration_ms)

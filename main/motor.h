@@ -4,8 +4,11 @@
  * The motor is a brushless gear motor with a built-in driver. This file is
  * the simple front door to the `door` component (components/door), which
  * does the careful work underneath: speed control from the motor's FG
- * pulses, the latch solenoid, stopping before reversing, and backing off
- * when something blocks the door (motor current from the INA228).
+ * pulses, the latch solenoid, stopping before reversing, and going back
+ * when someone holds the door (motor current from the INA228):
+ *
+ *   closing + door held -> opens again, ends OPEN
+ *   opening + door held -> closes again, ends CLOSED (latch locks)
  *
  * Angles are degrees of the motor's OUTPUT SHAFT: 0 = door closed (where the
  * shaft was at power-up), positive = opening direction.
@@ -23,11 +26,21 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "driver/i2c_master.h"
 #include "esp_err.h"
 
-/** Motor stopped + braked, door locked, control task started.
- *  The door must be CLOSED at power-up: that position becomes 0 degrees. */
-esp_err_t motor_init(void);
+/** How a door move ended (motor_wait()). */
+typedef enum {
+    MOTOR_DONE = 0,       /* reached open / closed                                */
+    MOTOR_WENT_BACK,      /* someone held the door: back in the previous state    */
+    MOTOR_FAILED,         /* blocked both ways, timed out, stopped, sensor lost... */
+    MOTOR_STILL_MOVING,   /* the wait timed out                                   */
+} motor_result_t;
+
+/** Motor stopped + braked, door locked, control task started, INA228 on the
+ *  shared I2C `bus`. The door must be CLOSED at power-up: that position
+ *  becomes 0 degrees. */
+esp_err_t motor_init(i2c_master_bus_handle_t bus);
 
 /* ---- Settings (start-up values are in config.h) --------------------------- */
 
@@ -47,9 +60,12 @@ void motor_close_door(void);    /* go to 0 degrees at the closing speed      */
 void motor_stop(void);          /* stop where it is, brake on                */
 
 /** Wait until the last started move has ended.
- *  @return true if the door reached its target, false if it was blocked,
- *          stopped, or still moving after `timeout_ms`. */
+ *  @return true if the door reached its target, false if it went back
+ *          (door held), was blocked, stopped, or still moving after `timeout_ms`. */
 bool motor_wait_done(uint32_t timeout_ms);
+
+/** Like motor_wait_done(), but tells how the move ended. */
+motor_result_t motor_wait(uint32_t timeout_ms);
 
 /* ---- Free rotation --------------------------------------------------------- */
 
@@ -63,6 +79,11 @@ bool motor_rotate(float degrees, float rpm);
 /** Current shaft angle in degrees (0 = closed). */
 float motor_get_angle(void);
 
-/** `callback` runs when the door gives up (blocked on every retry, or timed
- *  out). Keep it short; do not call motor_wait_done()/motor_rotate() in it. */
+/** `callback` runs when the door gives up (stuck both ways, timed out, or
+ *  not closed). Keep it short; do not call motor_wait_done()/motor_rotate() in it. */
 void motor_on_fault(void (*callback)(void));
+
+/** `callback` runs when someone held the door and it went back to its
+ *  previous state. `now_open`: true = it is open again (was closing),
+ *  false = closed again (was opening). Same rules as motor_on_fault(). */
+void motor_on_door_held(void (*callback)(bool now_open));
