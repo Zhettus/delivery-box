@@ -24,11 +24,12 @@ static const char *TAG = "led";
 /* Below this level a new mode starts at once (nothing visible to fade out). */
 #define FADE_SKIP_LEVEL     0.002f
 
-/* The strip is sent by DMA: the whole frame (24 symbols per LED) sits in one
- * buffer. Without DMA the RMT has room for 8 LEDs and an interrupt refills it
- * while the strip is sent; when the audio (I2S) or other interrupts delay a
- * refill, the rest of the strip gets garbage and shows random colors. */
-#define RMT_SYMBOLS              (LED_PIXELS * 24 + 64)
+/* The strip is sent by DMA from a 1024-symbol buffer (~42 LEDs; the RMT
+ * allows at most 2046). Without DMA the RMT has room for 8 LEDs and an
+ * interrupt refills it every few microseconds; when the audio (I2S) or other
+ * interrupts delay a refill, the rest of the strip gets garbage and shows
+ * random colors. With DMA a refill can be ~0.6 ms late without harm. */
+#define RMT_SYMBOLS              1024
 #define RMT_RESOLUTION_HZ        (10 * 1000 * 1000)
 
 static led_strip_handle_t s_strip;
