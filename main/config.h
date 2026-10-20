@@ -1,11 +1,4 @@
-/*
- * config.h — Every tunable value of the Delivery Box in one place.
- *
- * Pins live in board.h. What each robot state looks like lives in states.c.
- *
- * Values marked  [MEASURE]  depend on your mechanics/hardware and were
- * taken from the delivery-box-esp32s3 project.
- */
+
 #pragma once
 
 /* ======================================================================== */
@@ -55,7 +48,7 @@
 /* 1 = test run (see main.c): wait, then repeat: start_up, open, pause,
  *     close. Needs STATES_MOVE_DOOR 1.
  * 0 = the normal program: cycle through all robot states. */
-#define TEST_RUN                      1
+#define TEST_RUN                      0
 #define TEST_START_DELAY_MS           5000   /* 1. after the ESP32 starts: nothing  */
 #define TEST_STARTUP_MS               3000   /* 2. start_up, white pulse              */
 #define TEST_OPEN_PAUSE_MS            3000   /* 4. door stays open (0 = close at once) */
@@ -195,7 +188,7 @@
  * motor-audio-check, and gm.wav's rate. A WAV must have this rate. The mic
  * stream is decimated from it to MIC_STREAM_RATE_HZ (must divide it). */
 #define AUDIO_SAMPLE_RATE_HZ          48000
-#define AUDIO_VOLUME_PERCENT          100    /* 0..100, 100 = +6 dB (motor-audio-check) */
+#define AUDIO_VOLUME_PERCENT          70    /* 0..100, 100 = +6 dB (motor-audio-check) */
 #define AUDIO_TONE_LEVEL              0.35f  /* 0..1 digital level of beeps */
 #define AUDIO_AMP_OFF_AFTER_MS        500    /* speaker amp off after the last sound */
 
