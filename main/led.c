@@ -24,9 +24,11 @@ static const char *TAG = "led";
 /* Below this level a new mode starts at once (nothing visible to fade out). */
 #define FADE_SKIP_LEVEL     0.002f
 
-/* Only one RMT channel is used, so it can take all 4 memory blocks of the
- * ESP32-S3 (4 x 48 symbols): fewer refills while a long strip is sent. */
-#define RMT_SYMBOLS              (4 * 48)
+/* The strip is sent by DMA: the whole frame (24 symbols per LED) sits in one
+ * buffer. Without DMA the RMT has room for 8 LEDs and an interrupt refills it
+ * while the strip is sent; when the audio (I2S) or other interrupts delay a
+ * refill, the rest of the strip gets garbage and shows random colors. */
+#define RMT_SYMBOLS              (LED_PIXELS * 24 + 64)
 #define RMT_RESOLUTION_HZ        (10 * 1000 * 1000)
 
 static led_strip_handle_t s_strip;
@@ -327,7 +329,7 @@ esp_err_t led_init(void)
         .clk_src           = RMT_CLK_SRC_DEFAULT,
         .resolution_hz     = RMT_RESOLUTION_HZ,
         .mem_block_symbols = RMT_SYMBOLS,
-        .flags.with_dma    = false,
+        .flags.with_dma    = true,
     };
 
     esp_err_t err = led_strip_new_rmt_device(&strip_config, &rmt_config, &s_strip);
