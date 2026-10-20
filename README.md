@@ -9,6 +9,9 @@ LED and face logic from `delivery-box`, door motor logic and pin map from
   holds the door while it moves, the current rises and the door goes back to
   its previous state: **closing → opens again**, **opening → closes again**
   (and the latch locks), then beeps.
+- **Microphone over micro-ROS** — the ICS43434 is streamed live to ROS 2
+  (`/delivery_box/mic/audio`, 16 kHz), switched on and off by a topic. From
+  `mic_ros_handoff`.
 
 ## Build and flash
 
@@ -33,12 +36,16 @@ idf.py -p /dev/ttyACM0 flash monitor        # exit the monitor with Ctrl+]
 | `main/face.c` | the face (eyes + mouth, one MOSFET) |
 | `main/tail_light.c` | tail lights, on/off |
 | `main/sound.c` | the box's sounds (melodies + `main/gm.wav`) |
+| `main/mic_ros.c` | microphone -> micro-ROS stream (built only with micro-ROS) |
+| `main/usb_jtag_transport.c` | micro-ROS transport over the native USB port |
+| `tools/listen_live.py` | on the computer: switch the mic on, play it, save a WAV |
 | `main/config.h` | every number you may want to tune |
 | `main/board.h` | every pin |
 | `components/door` | door control internals from `delivery-box-esp32s3`; going back on a held door added |
 | `components/ina228` | motor-current sensor driver, copied unchanged |
-| `components/audio` | WM8960 + I2S playback (WAV clips, tones), from `motor-audio-check` |
-| `test/host` | PC unit tests of the door logic (`cd test/host && make`) |
+| `components/audio` | one full-duplex I2S port: WM8960 playback (from `motor-audio-check`) + ICS43434 capture and `mic_dsp` (from `mic_ros_handoff`) |
+| `components/micro_ros_espidf_component` | micro-ROS (NOT in git, copy it in: see "Microphone") |
+| `test/host` | PC unit tests: door logic + mic DSP (`cd test/host && make`) |
 
 ## States
 
@@ -161,6 +168,55 @@ Angles and speeds are at the motor's output shaft. Top speed is
 Every move retracts the latch first, stops before reversing, and goes back
 to the previous state if the motor current shows that someone holds the door.
 
+## Microphone (micro-ROS)
+
+The ICS43434 shares the I2S clocks with the speaker, so both run at
+`AUDIO_SAMPLE_RATE_HZ` (48 kHz). Capture: 48 kHz → high-pass, automatic gain,
+limiter → 16 kHz → 10 ms chunks → micro-ROS. The mic is **off** after boot and
+after every reconnect; nothing is sent until someone switches it on.
+
+| Topic | Type | Content |
+|---|---|---|
+| `/delivery_box/mic/enable` | `std_msgs/Bool` (in) | `true` = stream, `false` = stop |
+| `/delivery_box/mic/status` | `std_msgs/Bool` (out) | real state, on change + every 1 s |
+| `/delivery_box/mic/audio` | `std_msgs/Int16MultiArray` (out, best effort) | 160 samples = 10 ms of 16 kHz mono |
+
+**micro-ROS is only built when `components/micro_ros_espidf_component`
+exists.** It is ~475 MB, so it is not in git. Copy it from the working project
+(it has the `jazzy` branch plus the local `libmicroros.mk` fix):
+
+```bash
+rsync -a ~/delivery-box-esp32s3-microros/components/micro_ros_espidf_component/ \
+         components/micro_ros_espidf_component/
+rm -f sdkconfig && idf.py fullclean      # once: the console moves to UART0
+idf.py build
+```
+
+On a new computer, follow `MICRO_ROS_NEW_COMPUTER_SETUP.md` (the first build
+of the library takes several minutes). `app-colcon.meta` allows 6 publishers
+and 4 subscriptions, the same as `delivery-box-esp32s3-microros`. After
+changing it, run `idf.py clean-microros`.
+
+**Two USB-C ports with micro-ROS:**
+- "USB" (native, `/dev/ttyACM*`, on a Mac `/dev/cu.usbmodem*`): micro-ROS.
+  Flashing works through it too, but **no `idf.py monitor` there**.
+- "UART"/"COM" (`/dev/ttyUSB*`, on a Mac `/dev/cu.usbserial*` or
+  `/dev/cu.wchusbserial*`): the logs. `idf.py -p <that port> monitor`.
+
+Listen on the computer:
+
+```bash
+# terminal 1
+source /opt/ros/jazzy/setup.bash && source ~/uros_ws/install/local_setup.bash
+ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 -b 115200
+# terminal 2
+source /opt/ros/jazzy/setup.bash
+python3 tools/listen_live.py              # --wav talk.wav to save, --no-play for stats
+```
+
+Without micro-ROS the box works as before (logs on the native USB port) and
+the microphone is simply not streamed.
+
 ## Pins
 
 | GPIO | Signal |
@@ -172,6 +228,7 @@ to the previous state if the motor current shows that someone holds the door.
 | 8, 9, 10, 11 | tail light brake / run / left / right |
 | 1, 2 | I2C SDA / SCL, shared, 100 kHz: INA228 (0x40) + WM8960 HAT (0x1A) |
 | 14, 15, 16 | I2S BCLK / WS / DOUT → WM8960 P12 / P35 / P40 |
-| 17 | I2S DIN ← ICS43434 microphone (wired, not used yet) |
+| 17 | I2S DIN ← ICS43434 DOUT (SEL → GND, 3V → 3.3 V) |
+| 19, 20 | native USB: micro-ROS (when built with it) |
 | 5 | door-closed switch to GND (closed = door closed = LOW) |
 # delivery-box-digital-bridge

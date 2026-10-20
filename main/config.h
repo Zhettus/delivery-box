@@ -44,6 +44,14 @@
  * way, flip this between 1 and 0. 0 = counterclockwise (set 2026-10-01). */
 #define MOTOR_DIR_LEVEL_OPEN          0
 
+/* The firmware sets DIR (GPIO21) to 0 V for opening and 3.3 V for closing.
+ * If the motor turns the SAME way for both, it does not see the 3.3 V as
+ * "high" - typical for a motor that pulls its DIR input up to 5 V inside.
+ * Then set this to 1: for "high" the ESP32 lets go of the wire and the
+ * motor's own pull-up makes it 5 V. (Measure GPIO21 against GND while
+ * closing first: 3.3 V there = the wire and firmware are fine.) */
+#define MOTOR_DIR_OPEN_DRAIN          0
+
 /* 1 = test run (see main.c): wait, then repeat: start_up, open, pause,
  *     close. Needs STATES_MOVE_DOOR 1.
  * 0 = the normal program: cycle through all robot states. */
@@ -182,11 +190,27 @@
 /* ======================================================================== */
 /* Audio — WM8960 Audio HAT (speaker)                                       */
 /* ======================================================================== */
-#define AUDIO_ENABLED                 1      /* 0 = no HAT fitted: silent box */
-#define AUDIO_SAMPLE_RATE_HZ          48000  /* start rate; a WAV uses its own */
+#define AUDIO_ENABLED                 1      /* 0 = no HAT fitted: silent box (mic still works) */
+/* Speaker AND microphone (one I2S clock). 48 kHz: what the HAT played well in
+ * motor-audio-check, and gm.wav's rate. A WAV must have this rate. The mic
+ * stream is decimated from it to MIC_STREAM_RATE_HZ (must divide it). */
+#define AUDIO_SAMPLE_RATE_HZ          48000
 #define AUDIO_VOLUME_PERCENT          100    /* 0..100, 100 = +6 dB (motor-audio-check) */
 #define AUDIO_TONE_LEVEL              0.35f  /* 0..1 digital level of beeps */
 #define AUDIO_AMP_OFF_AFTER_MS        500    /* speaker amp off after the last sound */
+
+/* ======================================================================== */
+/* Microphone — ICS43434, streamed over micro-ROS (main/mic_ros.c)          */
+/* ======================================================================== */
+/* Only built when components/micro_ros_espidf_component exists (README).
+ * Topics: MIC_ROS_TOPIC_PREFIX + /enable, /status, /audio. */
+#define MIC_ROS_TOPIC_PREFIX          "/delivery_box/mic"
+#define MIC_STREAM_RATE_HZ            16000  /* what tools/listen_live.py plays */
+/* Processing (mic_dsp.h): MIC_DSP_AGC (automatic gain), MIC_DSP_FIXED
+ * (MIC_GAIN_DB always) or MIC_DSP_RAW (none). Values from the mic hand-off. */
+#define MIC_PROC_MODE                 MIC_DSP_AGC
+#define MIC_GAIN_DB                   24.0f  /* fixed gain / AGC start gain */
+#define MIC_HPF_HZ                    120.0f /* cuts rumble, e.g. the motor */
 
 /* 1 = the robot states play their sounds (see states.c), 0 = silent. */
 #define STATE_SOUNDS                  1

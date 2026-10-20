@@ -4,3 +4,6 @@ sdkconfig
 sdkconfig.old
 dependencies.lock
 test/host/test_door_fsm
+test/host/test_mic_dsp
+# micro-ROS: copy it in (README.md), too big for git
+components/micro_ros_espidf_component/

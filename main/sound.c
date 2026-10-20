@@ -25,29 +25,27 @@ static const audio_note_t NOTES_DOOR_HELD[] = { { 1319, 80 }, { 0, 60 }, { 1319,
 
 esp_err_t sound_init(i2c_master_bus_handle_t bus)
 {
-#if AUDIO_ENABLED
+    /* The I2S starts even without the HAT (or with AUDIO_ENABLED 0): the
+     * microphone needs its clocks. */
     audio_config_t cfg = {
-        .bus              = bus,
+        .bus              = AUDIO_ENABLED ? bus : NULL,
         .address          = AUDIO_WM8960_ADDRESS,
         .i2c_speed_hz     = I2C_SPEED_HZ,
         .bclk_gpio        = PIN_I2S_BCLK,
         .ws_gpio          = PIN_I2S_WS,
         .dout_gpio        = PIN_I2S_DOUT,
+        .din_gpio         = PIN_I2S_DIN,
         .sample_rate_hz   = AUDIO_SAMPLE_RATE_HZ,
         .volume_percent   = AUDIO_VOLUME_PERCENT,
         .tone_level       = AUDIO_TONE_LEVEL,
         .amp_off_after_ms = AUDIO_AMP_OFF_AFTER_MS,
     };
     return audio_init(&cfg);
-#else
-    ESP_LOGI(TAG, "audio switched off (AUDIO_ENABLED 0)");
-    return ESP_OK;
-#endif
 }
 
 void sound_play(sound_t s)
 {
-    if (!audio_available()) {
+    if (!audio_speaker_available()) {
         return;
     }
     audio_stop();                           /* the newest sound wins */
@@ -67,14 +65,14 @@ void sound_play(sound_t s)
 
 void sound_stop(void)
 {
-    if (audio_available()) {
+    if (audio_speaker_available()) {
         audio_stop();
     }
 }
 
 void sound_set_volume(uint8_t percent)
 {
-    if (audio_available()) {
+    if (audio_speaker_available()) {
         audio_set_volume(percent);
     }
 }

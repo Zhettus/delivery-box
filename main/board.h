@@ -23,8 +23,8 @@
 #define PIN_I2S_BCLK        GPIO_NUM_14   /* WM8960 P12  + ICS43434 BCLK      */
 #define PIN_I2S_WS          GPIO_NUM_15   /* WM8960 P35 (LRCLK) + ICS43434 LRCL */
 #define PIN_I2S_DOUT        GPIO_NUM_16   /* WM8960 P40 (DACDAT): to the speaker */
-#define PIN_I2S_DIN         GPIO_NUM_17   /* ICS43434 DOUT: microphone (wired,
-                                             not used by this firmware yet)  */
+#define PIN_I2S_DIN         GPIO_NUM_17   /* ICS43434 DOUT: microphone -> ESP32
+                                             (ICS43434 SEL -> GND = left slot) */
 
 /* ---- WS2815 LED strip (one strip, 134 LEDs) ---------------------------- */
 #define PIN_LED_STRIP       GPIO_NUM_4
@@ -74,7 +74,7 @@
  *   timer 2 -> door latch   channel  4     (solenoid, hold power)
  * RMT   : 1 TX channel for the LED strip
  * I2C   : I2C0 master (INA228 + WM8960)
- * I2S   : I2S0 TX (WM8960)
+ * I2S   : I2S0 full duplex: TX -> WM8960, RX <- ICS43434
  * PCNT  : 1 unit for the motor FG pulses
  * The tail lights are plain on/off GPIOs.
  */

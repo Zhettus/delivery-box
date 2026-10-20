@@ -1,0 +1,13 @@
+# Applied on top of sdkconfig.defaults when micro-ROS is built (CMakeLists.txt).
+#
+# Logs on UART0 = the "UART"/"COM" USB-C port (GPIO 43/44 via the USB bridge).
+# The native USB port ("USB") carries micro-ROS, so NO console may write
+# there: log text would corrupt the XRCE-DDS byte stream.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=115200
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# micro-ROS: Micro XRCE-DDS middleware. The transport is the custom USB
+# Serial/JTAG one in main/usb_jtag_transport.c (app-colcon.meta sets
+# RMW_UXRCE_TRANSPORT=custom); the component's WLAN/UDP settings are unused.
+CONFIG_MICRO_ROS_ESP_XRCE_DDS_MIDDLEWARE=y

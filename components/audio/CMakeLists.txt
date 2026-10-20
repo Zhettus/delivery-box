@@ -1,4 +1,4 @@
-idf_component_register(SRCS "audio.c"
+idf_component_register(SRCS "audio.c" "mic_dsp.c"
                        INCLUDE_DIRS "include"
                        REQUIRES driver)
 

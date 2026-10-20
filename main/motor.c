@@ -58,6 +58,7 @@ static door_config_t door_config(void)
             .dir_level_open = MOTOR_DIR_LEVEL_OPEN,
             .brake_level_on = MOTOR_BRAKE_LEVEL_ON,
             .pwm_inverted   = MOTOR_PWM_INVERTED,
+            .dir_open_drain = MOTOR_DIR_OPEN_DRAIN,
         },
         .pwm_timer   = LEDC_TIMER_MOTOR,
         .pwm_channel = LEDC_CH_MOTOR,

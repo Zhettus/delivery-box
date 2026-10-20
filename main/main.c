@@ -16,6 +16,9 @@
 #include "led.h"
 #include "motor.h"
 #include "sound.h"
+#if MIC_ROS
+#include "mic_ros.h"
+#endif
 #include "states.h"
 #include "tail_light.h"
 
@@ -57,13 +60,23 @@ static void start_everything(void)
     i2c_master_bus_handle_t bus = start_i2c_bus();
     ESP_ERROR_CHECK(motor_init(bus));   /* first: motor stopped, door locked */
     /* Audio after the INA228: the codec is set up before the I2S clocks start. */
-    if (sound_init(bus) != ESP_OK) {
-        ESP_LOGW(TAG, "no audio HAT: the box stays silent");
+    esp_err_t audio = sound_init(bus);
+    if (audio == ESP_ERR_NOT_FOUND) {
+        ESP_LOGW(TAG, "no audio HAT (or AUDIO_ENABLED 0): the box stays silent");
+    } else if (audio != ESP_OK) {
+        ESP_LOGE(TAG, "I2S failed (%s): no sound, no microphone", esp_err_to_name(audio));
     }
     tail_lights_init();
     ESP_ERROR_CHECK(face_init());
     ESP_ERROR_CHECK(led_init());
     motor_on_door_held(on_door_held);
+#if MIC_ROS
+    if (audio == ESP_OK || audio == ESP_ERR_NOT_FOUND) {     /* I2S runs: mic works */
+        mic_ros_start();
+    }
+#else
+    ESP_LOGI(TAG, "built without micro-ROS: no microphone stream (see README.md)");
+#endif
 }
 
 #if TEST_RUN

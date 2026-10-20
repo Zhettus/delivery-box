@@ -1,4 +1,5 @@
-# Host unit tests for the door logic (state machine, current guard, latch).
+# Host unit tests: door logic (state machine, current guard, latch) and the
+# microphone DSP (components/audio/mic_dsp.c).
 #
 #   cd test/host && make        # build + run
 #   make clean
@@ -8,10 +9,10 @@
 COMP    := ../../components
 CFLAGS  := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function \
            -fsanitize=address,undefined \
-           -I$(COMP)/door/include
+           -I$(COMP)/door/include -I$(COMP)/audio/include
 LDLIBS  := -lm
 
-TESTS := test_door_fsm
+TESTS := test_door_fsm test_mic_dsp
 
 all: $(TESTS)
 	@for t in $(TESTS); do ./$$t || exit 1; done
@@ -19,6 +20,9 @@ all: $(TESTS)
 
 test_door_fsm: test_door_fsm.c $(COMP)/door/door_fsm.c $(COMP)/door/motor_control.c \
                $(COMP)/door/current_guard.c $(COMP)/door/door_lock.c
+	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
+
+test_mic_dsp: test_mic_dsp.c $(COMP)/audio/mic_dsp.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 
 clean:

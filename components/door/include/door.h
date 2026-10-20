@@ -60,6 +60,8 @@ typedef struct {
     uint8_t    dir_level_open;   /* DIR level (0/1) that turns the door OPEN      */
     uint8_t    brake_level_on;   /* BRAKE level (0/1) that brakes                 */
     bool       pwm_inverted;     /* true: motor runs faster with LESS high time   */
+    bool       dir_open_drain;   /* true: DIR "high" = let go of the wire, for a
+                                    motor that pulls DIR up to 5 V itself        */
 } door_bldc_config_t;
 
 /* Brushed motor + DFRobot DRI0042 + 2-channel Hall encoder. */

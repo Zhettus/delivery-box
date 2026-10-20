@@ -27,7 +27,8 @@ typedef enum {
     SOUND_DOOR_HELD,
 } sound_t;
 
-/** Configure the WM8960 on the shared I2C `bus`, then start I2S. */
+/** Configure the WM8960 on the shared I2C `bus`, then start I2S (speaker +
+ *  microphone). ESP_ERR_NOT_FOUND = no HAT: silent, but the mic still works. */
 esp_err_t sound_init(i2c_master_bus_handle_t bus);
 
 void sound_play(sound_t s);
