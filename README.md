@@ -22,6 +22,11 @@ idf.py build
 idf.py -p /dev/ttyACM0 flash monitor        # exit the monitor with Ctrl+]
 ```
 
+**Audio HAT check:** `idf.py -DAUDIO_CHECK=1 build flash monitor` builds
+`main/audio_check.c` instead of the firmware: it plays `main/gm.wav` in a loop
+(motor held stopped) and logs whether the WM8960 answers. Back to the firmware:
+`idf.py -DAUDIO_CHECK=0 build flash`.
+
 **Power up with the door closed.** The shaft position at power-up is taken as
 "closed" (0°).
 
