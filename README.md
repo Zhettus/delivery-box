@@ -27,6 +27,13 @@ idf.py -p /dev/ttyACM0 flash monitor        # exit the monitor with Ctrl+]
 (motor held stopped) and logs whether the WM8960 answers. Back to the firmware:
 `idf.py -DAUDIO_CHECK=0 build flash`.
 
+**Microphone check:** `idf.py -DMIC_CHECK=1 build flash monitor` builds
+`main/mic_check.c`: a level meter for the ICS43434 in the log (two lines a
+second), with a wiring diagnosis (no data, stuck line, SEL on the wrong side,
+clock wires swapped). With the audio HAT working it also records 3 s every 10 s
+("speak now") and plays it back. The HAT is not needed for the meter. Back to
+the firmware: `idf.py -DMIC_CHECK=0 build flash`. Only one check at a time.
+
 **Power up with the door closed.** The shaft position at power-up is taken as
 "closed" (0°).
 

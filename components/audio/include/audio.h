@@ -80,6 +80,11 @@ uint32_t audio_sample_rate(void);
  */
 esp_err_t audio_mic_read(int32_t *samples, size_t count, size_t *got, uint32_t timeout_ms);
 
+/** Both I2S slots, interleaved left, right (2 x `frames` values, 24-bit).
+ *  For checking the wiring: the ICS43434 talks in the left slot when its SEL
+ *  pin is on GND, in the right slot when SEL is on 3.3 V. */
+esp_err_t audio_mic_read_stereo(int32_t *lr, size_t frames, size_t *got, uint32_t timeout_ms);
+
 /** Queue a WAV clip in flash (e.g. from EMBED_FILES). Checked when queued. */
 esp_err_t audio_play_wav(const uint8_t *wav_start, const uint8_t *wav_end);
 

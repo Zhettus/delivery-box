@@ -433,8 +433,10 @@ uint32_t audio_sample_rate(void)
     return s_rate;
 }
 
-/* From the mic hand-off (delivery-box-esp32s3 audio.c): left slot, 24-bit. */
-esp_err_t audio_mic_read(int32_t *samples, size_t count, size_t *got, uint32_t timeout_ms)
+/* From the mic hand-off (delivery-box-esp32s3 audio.c): left slot, 24-bit.
+ * `stereo`: both slots, interleaved L, R (for the microphone check). */
+static esp_err_t mic_read(int32_t *samples, size_t count, size_t *got, uint32_t timeout_ms,
+                          bool stereo)
 {
     static int32_t frames[FRAMES_PER_CHUNK * 2];
     size_t    n   = 0;
@@ -459,7 +461,13 @@ esp_err_t audio_mic_read(int32_t *samples, size_t count, size_t *got, uint32_t t
         }
         size_t frames_read = bytes / (2 * sizeof(int32_t));
         for (size_t i = 0; i < frames_read; i++) {
-            samples[n++] = frames[2 * i] >> 8;   /* left slot (SEL = GND), 24-bit signed */
+            if (stereo) {
+                samples[2 * n]     = frames[2 * i] >> 8;       /* left  */
+                samples[2 * n + 1] = frames[2 * i + 1] >> 8;   /* right */
+                n++;
+            } else {
+                samples[n++] = frames[2 * i] >> 8;   /* left slot (SEL = GND), 24-bit signed */
+            }
         }
     }
     xSemaphoreGive(s_rx_mutex);
@@ -468,4 +476,14 @@ esp_err_t audio_mic_read(int32_t *samples, size_t count, size_t *got, uint32_t t
         *got = n;
     }
     return err;
+}
+
+esp_err_t audio_mic_read(int32_t *samples, size_t count, size_t *got, uint32_t timeout_ms)
+{
+    return mic_read(samples, count, got, timeout_ms, false);
+}
+
+esp_err_t audio_mic_read_stereo(int32_t *lr, size_t frames, size_t *got, uint32_t timeout_ms)
+{
+    return mic_read(lr, frames, got, timeout_ms, true);
 }
